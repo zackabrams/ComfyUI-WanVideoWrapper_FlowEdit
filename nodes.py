@@ -640,6 +640,42 @@ class WanVideoImageClipEncode:
         }
 
         return (image_embeds,)
+    
+class WanVideoEmptyEmbeds:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "generation_width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 8, "tooltip": "Width of the image to encode"}),
+            "generation_height": ("INT", {"default": 480, "min": 64, "max": 29048, "step": 8, "tooltip": "Height of the image to encode"}),
+            "num_frames": ("INT", {"default": 81, "min": 5, "max": 10000, "step": 4, "tooltip": "Number of frames to encode"}),
+            },
+        }
+
+    RETURN_TYPES = ("WANVIDIMAGE_EMBEDS", )
+    RETURN_NAMES = ("image_embeds",)
+    FUNCTION = "process"
+    CATEGORY = "WanVideoWrapper"
+
+    def process(self, num_frames, generation_width, generation_height):
+
+        patch_size = (1, 2, 2)
+        vae_stride = (4, 8, 8)
+
+        target_shape = (16, (num_frames - 1) // vae_stride[0] + 1,
+                        generation_height // vae_stride[1],
+                        generation_width // vae_stride[2])
+
+        seq_len = math.ceil((target_shape[2] * target_shape[3]) /
+                            (patch_size[1] * patch_size[2]) *
+                            target_shape[1])
+        
+        embeds = {
+            "max_seq_len": seq_len,
+            "target_shape": target_shape,
+            "num_frames": num_frames
+        }
+    
+        return (embeds,)
 
 
 #region Sampler
@@ -758,36 +794,48 @@ class WanVideoSampler:
         
         seed_g = torch.Generator(device=torch.device("cpu"))
         seed_g.manual_seed(seed)
+        if transformer.model_type == "i2v":
+            noise = torch.randn(
+                16,
+                (image_embeds["num_frames"] - 1) // 4 + 1,
+                image_embeds["lat_h"],
+                image_embeds["lat_w"],
+                dtype=torch.float32,
+                generator=seed_g,
+                device=torch.device("cpu"))
+            seq_len = image_embeds["max_seq_len"]
+        else: #t2v
+            target_shape = image_embeds["target_shape"]
+            seq_len = image_embeds["max_seq_len"]
         noise = torch.randn(
-            16,
-            (image_embeds["num_frames"] - 1) // 4 + 1,
-            image_embeds["lat_h"],
-            image_embeds["lat_w"],
-            dtype=torch.float32,
-            generator=seed_g,
-            device=torch.device("cpu"))
-        latent = noise.to(device)
+                target_shape[0],
+                target_shape[1],
+                target_shape[2],
+                target_shape[3],
+                dtype=torch.float32,
+                device=torch.device("cpu"),
+                generator=seed_g)
 
-        print(text_embeds["prompt_embeds"][0].device)
-        print(image_embeds["clip_context"].device)
-        print(image_embeds["image_embeds"].device)
-        print(noise.device)
+        latent = noise.to(device)
 
         d = transformer.dim // transformer.num_heads
         freqs = torch.cat([
-            rope_params(1024, d - 4 * (d // 6), L_test=image_embeds["num_frames"], k=riflex_freq_index),
-            rope_params(1024, 2 * (d // 6), L_test=image_embeds["num_frames"], k=riflex_freq_index),
-            rope_params(1024, 2 * (d // 6), L_test=image_embeds["num_frames"], k=riflex_freq_index)
+            rope_params(1024, d - 4 * (d // 6), L_test=latent.shape[2], k=riflex_freq_index),
+            rope_params(1024, 2 * (d // 6), L_test=latent.shape[2], k=riflex_freq_index),
+            rope_params(1024, 2 * (d // 6), L_test=latent.shape[2], k=riflex_freq_index)
         ],
         dim=1)
 
         base_args = {
-            'clip_fea': image_embeds["clip_context"],
-            'seq_len': image_embeds["max_seq_len"],
-            'y': [image_embeds["image_embeds"]],
+            'clip_fea': image_embeds.get('clip_context', None),
+            'seq_len': seq_len,
             'device': device,
             'freqs': freqs,
         }
+        if transformer.model_type == "i2v":
+            base_args.update({
+                 'y': [image_embeds["image_embeds"]],
+            })
 
         arg_c = base_args.copy()
         arg_c.update({'context': [text_embeds["prompt_embeds"][0]]})
@@ -1018,6 +1066,7 @@ NODE_CLASS_MAPPINGS = {
     "WanVideoBlockSwap": WanVideoBlockSwap,
     "WanVideoTorchCompileSettings": WanVideoTorchCompileSettings,
     "WanVideoLatentPreview": WanVideoLatentPreview,
+    "WanVideoEmptyEmbeds": WanVideoEmptyEmbeds,
     }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoSampler": "WanVideo Sampler",
@@ -1032,5 +1081,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoEncode": "WanVideo Encode",
     "WanVideoBlockSwap": "WanVideo BlockSwap",
     "WanVideoTorchCompileSettings": "WanVideo Torch Compile Settings",
-    "WanVideoLatentPreview": "WanVideo Latent Preview", 
+    "WanVideoLatentPreview": "WanVideo Latent Preview",
+    "WanVideoEmptyEmbeds": "WanVideo Empty Embeds",
     }

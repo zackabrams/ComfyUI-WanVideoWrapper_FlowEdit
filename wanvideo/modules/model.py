@@ -163,7 +163,7 @@ class WanSelfAttention(nn.Module):
 
 class WanT2VCrossAttention(WanSelfAttention):
 
-    def forward(self, x, context, context_lens, attention_mode):
+    def forward(self, x, context, context_lens):
         r"""
         Args:
             x(Tensor): Shape [B, L1, C]
@@ -541,7 +541,7 @@ class WanModel(ModelMixin, ConfigMixin):
         #device = self.patch_embedding.weight.device
         if freqs.device != device:
             freqs = freqs.to(device)
-
+        
         if y is not None:
             x = [torch.cat([u, v], dim=0) for u, v in zip(x, y)]
 
