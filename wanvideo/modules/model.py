@@ -26,12 +26,14 @@ def sinusoidal_embedding_1d(dim, position):
 
 
 @amp.autocast(enabled=False)
-def rope_params(max_seq_len, dim, theta=10000):
+def rope_params(max_seq_len, dim, theta=10000, L_test=81, k=0):
     assert dim % 2 == 0
     freqs = torch.outer(
         torch.arange(max_seq_len),
         1.0 / torch.pow(theta,
                         torch.arange(0, dim, 2).to(torch.float64).div(dim)))
+    if k > 0:
+        freqs[k-1] = 0.9 * 2 * torch.pi / L_test
     freqs = torch.polar(torch.ones_like(freqs), freqs)
     return freqs
 
@@ -481,13 +483,7 @@ class WanModel(ModelMixin, ConfigMixin):
 
         # buffers (don't use register_buffer otherwise dtype will be changed in to())
         assert (dim % num_heads) == 0 and (dim // num_heads) % 2 == 0
-        d = dim // num_heads
-        self.freqs = torch.cat([
-            rope_params(1024, d - 4 * (d // 6)),
-            rope_params(1024, 2 * (d // 6)),
-            rope_params(1024, 2 * (d // 6))
-        ],
-                               dim=1)
+        
 
         if model_type == 'i2v':
             self.img_emb = MLPProj(1280, dim)
@@ -516,6 +512,7 @@ class WanModel(ModelMixin, ConfigMixin):
         clip_fea=None,
         y=None,
         device=torch.device('cuda'),
+        freqs=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -542,8 +539,8 @@ class WanModel(ModelMixin, ConfigMixin):
             assert clip_fea is not None and y is not None
         # params
         #device = self.patch_embedding.weight.device
-        if self.freqs.device != device:
-            self.freqs = self.freqs.to(device)
+        if freqs.device != device:
+            freqs = freqs.to(device)
 
         if y is not None:
             x = [torch.cat([u, v], dim=0) for u, v in zip(x, y)]
@@ -585,7 +582,7 @@ class WanModel(ModelMixin, ConfigMixin):
             e=e0,
             seq_lens=seq_lens,
             grid_sizes=grid_sizes,
-            freqs=self.freqs,
+            freqs=freqs,
             context=context,
             context_lens=context_lens)
 

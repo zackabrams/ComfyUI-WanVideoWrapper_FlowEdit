@@ -17,9 +17,8 @@ from tqdm import tqdm
 #available_schedulers = list(scheduler_mapping.keys())
 
 from .wanvideo.modules.clip import CLIPModel
-from .wanvideo.modules.model import WanModel
+from .wanvideo.modules.model import WanModel, rope_params
 from .wanvideo.modules.t5 import T5EncoderModel
-from .wanvideo.modules.vae import WanVAE
 from .wanvideo.utils.fm_solvers import (FlowDPMSolverMultistepScheduler,
                                get_sampling_sigmas, retrieve_timesteps)
 from .wanvideo.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
@@ -152,7 +151,7 @@ class WanVideoModelLoader:
                     "flash_attn_3",
                     "sageattn",
                     ], {"default": "sdpa"}),
-                "compile_args": ("COMPILEARGS", ),
+                "compile_args": ("WANCOMPILEARGS", ),
                 "block_swap_args": ("BLOCKSWAPARGS", ),
             }
         }
@@ -405,7 +404,7 @@ class WanVideoTorchCompileSettings:
 
             },
         }
-    RETURN_TYPES = ("COMPILEARGS",)
+    RETURN_TYPES = ("WANCOMPILEARGS",)
     RETURN_NAMES = ("torch_compile_args",)
     FUNCTION = "loadmodel"
     CATEGORY = "WanVideoWrapper"
@@ -602,7 +601,7 @@ class WanVideoImageClipEncode:
         h = lat_h * vae_stride[1]
         w = lat_w * vae_stride[2]
 
-        msk = torch.ones(1, 81, lat_h, lat_w, device=device)
+        msk = torch.ones(1, num_frames, lat_h, lat_w, device=device)
         msk[:, 1:] = 0
         msk = torch.concat([
             torch.repeat_interleave(msk[:, 0:1], repeats=4, dim=1), msk[:, 1:]
@@ -624,7 +623,7 @@ class WanVideoImageClipEncode:
                 torch.nn.functional.interpolate(
                     image.permute(0, 3, 1, 2), size=(h, w), mode='bicubic').transpose(
                         0, 1),
-                torch.zeros(3, 80, h, w, device=device)
+                torch.zeros(3, num_frames-1, h, w, device=device)
             ],
                          dim=1).to(image)
         ],device)[0]
@@ -657,10 +656,12 @@ class WanVideoSampler:
                 "shift": ("FLOAT", {"default": 5.0, "min": 0.0, "max": 1000.0, "step": 0.01}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "force_offload": ("BOOLEAN", {"default": True}),
-                "scheduler": (["unipc", "dpm++"],
+                "scheduler": (["unipc", "dpm++", "dpm++_sde"],
                     {
                         "default": 'dpm++'
                     }),
+                "riflex_freq_index": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1, "tooltip": "Frequency index for RIFLEX, disabled when 0, default 4. Allows for new frames to be generated after without looping"}),
+
 
             },
             # "optional": {
@@ -677,7 +678,7 @@ class WanVideoSampler:
     FUNCTION = "process"
     CATEGORY = "WanVideoWrapper"
 
-    def process(self, model, text_embeds, image_embeds, shift, steps, cfg, seed, scheduler, force_offload=True):
+    def process(self, model, text_embeds, image_embeds, shift, steps, cfg, seed, scheduler, riflex_freq_index, force_offload=True):
         model = model.model
         transformer = model.diffusion_model
 
@@ -736,11 +737,16 @@ class WanVideoSampler:
             sample_scheduler.set_timesteps(
                 steps, device=device, shift=shift)
             timesteps = sample_scheduler.timesteps
-        elif scheduler == 'dpm++':
+        elif 'dpm++' in scheduler:
+            if scheduler == 'dpm++_sde':
+                algorithm_type = "sde-dpmsolver++"
+            else:
+                algorithm_type = "dpmsolver++"
             sample_scheduler = FlowDPMSolverMultistepScheduler(
                 num_train_timesteps=1000,
                 shift=shift,
-                use_dynamic_shifting=False)
+                use_dynamic_shifting=False,
+                algorithm_type= algorithm_type)
             sampling_sigmas = get_sampling_sigmas(steps, shift)
             timesteps, _ = retrieve_timesteps(
                 sample_scheduler,
@@ -750,39 +756,44 @@ class WanVideoSampler:
             raise NotImplementedError("Unsupported solver.")
         
         
-        seed_g = torch.Generator(device=device)
+        seed_g = torch.Generator(device=torch.device("cpu"))
         seed_g.manual_seed(seed)
         noise = torch.randn(
             16,
-            21,
+            (image_embeds["num_frames"] - 1) // 4 + 1,
             image_embeds["lat_h"],
             image_embeds["lat_w"],
             dtype=torch.float32,
             generator=seed_g,
-            device=device)
-        latent = noise
+            device=torch.device("cpu"))
+        latent = noise.to(device)
 
         print(text_embeds["prompt_embeds"][0].device)
         print(image_embeds["clip_context"].device)
         print(image_embeds["image_embeds"].device)
         print(noise.device)
 
-        arg_c = {
-            'context': [text_embeds["prompt_embeds"][0]],
+        d = transformer.dim // transformer.num_heads
+        freqs = torch.cat([
+            rope_params(1024, d - 4 * (d // 6), L_test=image_embeds["num_frames"], k=riflex_freq_index),
+            rope_params(1024, 2 * (d // 6), L_test=image_embeds["num_frames"], k=riflex_freq_index),
+            rope_params(1024, 2 * (d // 6), L_test=image_embeds["num_frames"], k=riflex_freq_index)
+        ],
+        dim=1)
+
+        base_args = {
             'clip_fea': image_embeds["clip_context"],
             'seq_len': image_embeds["max_seq_len"],
             'y': [image_embeds["image_embeds"]],
             'device': device,
+            'freqs': freqs,
         }
 
-        arg_null = {
-            'context': text_embeds["negative_prompt_embeds"],
-            'clip_fea': image_embeds["clip_context"],
-            'seq_len': image_embeds["max_seq_len"],
-            'y': [image_embeds["image_embeds"]],
-            'device': device,
-        }
+        arg_c = base_args.copy()
+        arg_c.update({'context': [text_embeds["prompt_embeds"][0]]})
 
+        arg_null = base_args.copy()
+        arg_null.update({'context': text_embeds["negative_prompt_embeds"]})
         
         pbar = ProgressBar(steps)
 
