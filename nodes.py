@@ -982,7 +982,6 @@ class WanVideoDecode:
 
         latents = latents.to(device = device, dtype = vae.dtype)
 
-        
         mm.soft_empty_cache()
 
         image = vae.decode(latents, device=device, tiled=enable_vae_tiling, tile_size=(tile_x, tile_y), tile_stride=(tile_stride_x, tile_stride_y))[0]
@@ -990,7 +989,7 @@ class WanVideoDecode:
         print(image.min(), image.max())
         vae.to(offload_device)
 
-        image = (image + 1.0) / 2.0
+        image = (image - image.min()) / (image.max() - image.min())
         image = torch.clamp(image, 0.0, 1.0)
         image = image.permute(1, 2, 3, 0).cpu().float()
 

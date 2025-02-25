@@ -454,6 +454,11 @@ class WanModel(ModelMixin, ConfigMixin):
         self.main_device = main_device
         self.offload_device = offload_device
 
+        self.double_blocks_to_swap = -1
+        self.single_blocks_to_swap = -1
+        self.offload_txt_in = False
+        self.offload_img_in = False
+
         # embeddings
         self.patch_embedding = nn.Conv3d(
             in_dim, dim, kernel_size=patch_size, stride=patch_size)
@@ -491,7 +496,7 @@ class WanModel(ModelMixin, ConfigMixin):
             self.img_emb = MLPProj(1280, dim)
 
         # initialize weights
-        self.init_weights()
+        #self.init_weights()
 
     def block_swap(self, blocks_to_swap):
         print(f"Swapping {blocks_to_swap + 1} transformer blocks")
@@ -544,8 +549,6 @@ class WanModel(ModelMixin, ConfigMixin):
             self.freqs = self.freqs.to(device)
 
         if y is not None:
-            print("u.shape: ", x[0].shape)
-            print("v.shape: ", y[0].shape)
             x = [torch.cat([u, v], dim=0) for u, v in zip(x, y)]
 
         # embeddings
@@ -554,8 +557,6 @@ class WanModel(ModelMixin, ConfigMixin):
             [torch.tensor(u.shape[2:], dtype=torch.long) for u in x])
         x = [u.flatten(2).transpose(1, 2) for u in x]
         seq_lens = torch.tensor([u.size(1) for u in x], dtype=torch.long)
-        print("seq_len: ", seq_len)
-        print("seq_lens.max(): ", seq_lens.max())
         assert seq_lens.max() <= seq_len
         x = torch.cat([
             torch.cat([u, u.new_zeros(1, seq_len - u.size(1), u.size(2))],
