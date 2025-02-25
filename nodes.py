@@ -372,6 +372,10 @@ class WanVideoVAELoader:
         #    vae_config = json.load(f)
         model_path = folder_paths.get_full_path("vae", model_name)
         vae_sd = load_torch_file(model_path, safe_load=True)
+
+        has_model_prefix = any(k.startswith("model.") for k in vae_sd.keys())
+        if not has_model_prefix:
+            vae_sd = {f"model.{k}": v for k, v in vae_sd.items()}
         
         vae = WanVideoVAE(dtype=dtype)
         vae.load_state_dict(vae_sd)
