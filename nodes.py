@@ -1,22 +1,20 @@
 import os
 import torch
-import json
 import gc
 from .utils import log, print_memory
-from diffusers.video_processor import VideoProcessor
-from typing import List, Dict, Any, Tuple
 import numpy as np
 import math
 from tqdm import tqdm
-from diffusers.schedulers import FlowMatchEulerDiscreteScheduler, DPMSolverMultistepScheduler, SASolverScheduler, UniPCMultistepScheduler
+# from diffusers.schedulers import FlowMatchEulerDiscreteScheduler, DPMSolverMultistepScheduler, SASolverScheduler, UniPCMultistepScheduler
 
-scheduler_mapping = {
-    "FlowMatchEulerDiscreteScheduler": FlowMatchEulerDiscreteScheduler,
-    "SDE-DPMSolverMultistepScheduler": DPMSolverMultistepScheduler,
-    "DPMSolverMultistepScheduler": DPMSolverMultistepScheduler,
-    "SASolverScheduler": SASolverScheduler,
-    "UniPCMultistepScheduler": UniPCMultistepScheduler,
-}
+# scheduler_mapping = {
+#     "FlowMatchEulerDiscreteScheduler": FlowMatchEulerDiscreteScheduler,
+#     "SDE-DPMSolverMultistepScheduler": DPMSolverMultistepScheduler,
+#     "DPMSolverMultistepScheduler": DPMSolverMultistepScheduler,
+#     "SASolverScheduler": SASolverScheduler,
+#     "UniPCMultistepScheduler": UniPCMultistepScheduler,
+# }
+#available_schedulers = list(scheduler_mapping.keys())
 
 from .wanvideo.modules.clip import CLIPModel
 from .wanvideo.modules.model import WanModel
@@ -26,22 +24,16 @@ from .wanvideo.utils.fm_solvers import (FlowDPMSolverMultistepScheduler,
                                get_sampling_sigmas, retrieve_timesteps)
 from .wanvideo.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 
-available_schedulers = list(scheduler_mapping.keys())
-
 from accelerate import init_empty_weights
 from accelerate.utils import set_module_tensor_to_device
 
 import folder_paths
-folder_paths.add_model_folder_path("wanvideo_embeds", os.path.join(folder_paths.get_output_directory(), "wanvideo_embeds"))
-
 import comfy.model_management as mm
 from comfy.utils import load_torch_file, save_torch_file, ProgressBar
 import comfy.model_base
 import comfy.latent_formats
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
-
-VAE_SCALING_FACTOR = 0.476986
 
 def add_noise_to_reference_video(image, ratio=None):
     if ratio is None:
@@ -658,112 +650,7 @@ class WanVideoImageClipEncode:
 
         return (image_embeds,)
 
-#region embeds
-class WanVideoTextEmbedsSave:
-    def __init__(self):
-        self.output_dir = folder_paths.get_output_directory()
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {
-            "hyvid_embeds": ("HYVIDEMBEDS",),
-            "filename_prefix": ("STRING", {"default": "hyvid_embeds/hyvid_embed"}),
-            },
-            "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
-        }
 
-    RETURN_TYPES = ("STRING", )
-    RETURN_NAMES = ("output_path",)
-    FUNCTION = "save"
-    CATEGORY = "WanVideoWrapper"
-    DESCRIPTION = "Save the text embeds"
-
-
-    def save(self, hyvid_embeds, prompt, filename_prefix, extra_pnginfo=None):
-        from comfy.cli_args import args
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir)
-        file = f"{filename}_{counter:05}_.safetensors"
-        file = os.path.join(full_output_folder, file)
-
-        tensors_to_save = {}
-        for key, value in hyvid_embeds.items():
-            if value is not None:
-                tensors_to_save[key] = value
-
-        prompt_info = ""
-        if prompt is not None:
-            prompt_info = json.dumps(prompt)
-        metadata = None
-        if not args.disable_metadata:
-            metadata = {"prompt": prompt_info}
-            if extra_pnginfo is not None:
-                for x in extra_pnginfo:
-                    metadata[x] = json.dumps(extra_pnginfo[x])
-        
-        save_torch_file(tensors_to_save, file, metadata=metadata)
-        
-        return (file,)
-
-class WanVideoTextEmbedsLoad:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {"embeds": (folder_paths.get_filename_list("hyvid_embeds"), {"tooltip": "The saved embeds to load from output/hyvid_embeds."})}}
-
-    RETURN_TYPES = ("HYVIDEMBEDS", )
-    RETURN_NAMES = ("hyvid_embeds",)
-    FUNCTION = "load"
-    CATEGORY = "WanVideoWrapper"
-    DESCTIPTION = "Load the saved text embeds"
-
-
-    def load(self, embeds):
-        embed_path = folder_paths.get_full_path_or_raise("hyvid_embeds", embeds)
-        loaded_tensors = load_torch_file(embed_path, safe_load=True)
-        # Reconstruct original dictionary with None for missing keys
-        prompt_embeds_dict = {
-            "prompt_embeds": loaded_tensors.get("prompt_embeds", None),
-            "negative_prompt_embeds": loaded_tensors.get("negative_prompt_embeds", None),
-            "attention_mask": loaded_tensors.get("attention_mask", None),
-            "negative_attention_mask": loaded_tensors.get("negative_attention_mask", None),
-            "prompt_embeds_2": loaded_tensors.get("prompt_embeds_2", None),
-            "negative_prompt_embeds_2": loaded_tensors.get("negative_prompt_embeds_2", None),
-            "attention_mask_2": loaded_tensors.get("attention_mask_2", None),
-            "negative_attention_mask_2": loaded_tensors.get("negative_attention_mask_2", None),
-            "cfg": loaded_tensors.get("cfg", None),
-            "start_percent": loaded_tensors.get("start_percent", None),
-            "end_percent": loaded_tensors.get("end_percent", None),
-            "batched_cfg": loaded_tensors.get("batched_cfg", None),
-        }
-        
-        return (prompt_embeds_dict,)
-    
-class WanVideoContextOptions:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {
-            "context_schedule": (["uniform_standard", "uniform_looped", "static_standard"],),
-            "context_frames": ("INT", {"default": 65, "min": 2, "max": 1000, "step": 1, "tooltip": "Number of pixel frames in the context, NOTE: the latent space has 4 frames in 1"} ),
-            "context_stride": ("INT", {"default": 4, "min": 4, "max": 100, "step": 1, "tooltip": "Context stride as pixel frames, NOTE: the latent space has 4 frames in 1"} ),
-            "context_overlap": ("INT", {"default": 4, "min": 4, "max": 100, "step": 1, "tooltip": "Context overlap as pixel frames, NOTE: the latent space has 4 frames in 1"} ),
-            "freenoise": ("BOOLEAN", {"default": True, "tooltip": "Shuffle the noise"}),
-            }
-        }
-
-    RETURN_TYPES = ("HYVIDCONTEXT", )
-    RETURN_NAMES = ("context_options",)
-    FUNCTION = "process"
-    CATEGORY = "WanVideoWrapper"
-    DESCRIPTION = "Context options for WanVideo, allows splitting the video into context windows and attemps blending them for longer generations than the model and memory otherwise would allow."
-
-    def process(self, context_schedule, context_frames, context_stride, context_overlap, freenoise):
-        context_options = {
-            "context_schedule":context_schedule,
-            "context_frames":context_frames,
-            "context_stride":context_stride,
-            "context_overlap":context_overlap,
-            "freenoise":freenoise
-        }
-
-        return (context_options,)
 #region Sampler
 class WanVideoSampler:
     @classmethod
@@ -934,7 +821,6 @@ class WanVideoSampler:
                 latent = temp_x0.squeeze(0)
 
                 x0 = [latent.to(device)]
-                print(x0[0].shape)
                 del latent_model_input, timestep
                 pbar.update(1)
 
@@ -1129,9 +1015,6 @@ NODE_CLASS_MAPPINGS = {
     "WanVideoBlockSwap": WanVideoBlockSwap,
     "WanVideoTorchCompileSettings": WanVideoTorchCompileSettings,
     "WanVideoLatentPreview": WanVideoLatentPreview,
-    "WanVideoTextEmbedsSave": WanVideoTextEmbedsSave,
-    "WanVideoTextEmbedsLoad": WanVideoTextEmbedsLoad,
-    "WanVideoContextOptions": WanVideoContextOptions,
     }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoSampler": "WanVideo Sampler",
@@ -1146,10 +1029,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoEncode": "WanVideo Encode",
     "WanVideoBlockSwap": "WanVideo BlockSwap",
     "WanVideoTorchCompileSettings": "WanVideo Torch Compile Settings",
-    "WanVideoLatentPreview": "WanVideo Latent Preview",
-    "WanVideoLoraSelect": "WanVideo Lora Select",
-    "WanVideoLoraBlockEdit": "WanVideo Lora Block Edit",
-    "WanVideoTextEmbedsSave": "WanVideo TextEmbeds Save",
-    "WanVideoTextEmbedsLoad": "WanVideo TextEmbeds Load",
-    "WanVideoContextOptions": "WanVideo Context Options",
+    "WanVideoLatentPreview": "WanVideo Latent Preview", 
     }
