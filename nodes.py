@@ -5,16 +5,6 @@ from .utils import log, print_memory
 import numpy as np
 import math
 from tqdm import tqdm
-# from diffusers.schedulers import FlowMatchEulerDiscreteScheduler, DPMSolverMultistepScheduler, SASolverScheduler, UniPCMultistepScheduler
-
-# scheduler_mapping = {
-#     "FlowMatchEulerDiscreteScheduler": FlowMatchEulerDiscreteScheduler,
-#     "SDE-DPMSolverMultistepScheduler": DPMSolverMultistepScheduler,
-#     "DPMSolverMultistepScheduler": DPMSolverMultistepScheduler,
-#     "SASolverScheduler": SASolverScheduler,
-#     "UniPCMultistepScheduler": UniPCMultistepScheduler,
-# }
-#available_schedulers = list(scheduler_mapping.keys())
 
 from .wanvideo.modules.clip import CLIPModel
 from .wanvideo.modules.model import WanModel, rope_params
@@ -169,7 +159,7 @@ class WanVideoModelLoader:
         manual_offloading = True
         if "sage" in attention_mode:
             try:
-                from sageattention import sageattn_varlen
+                from sageattention import sageattn
             except Exception as e:
                 raise ValueError(f"Can't import SageAttention: {str(e)}")
 
