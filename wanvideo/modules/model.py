@@ -454,10 +454,7 @@ class WanModel(ModelMixin, ConfigMixin):
         self.main_device = main_device
         self.offload_device = offload_device
 
-        self.double_blocks_to_swap = -1
-        self.single_blocks_to_swap = -1
-        self.offload_txt_in = False
-        self.offload_img_in = False
+        self.blocks_to_swap = -1
 
         # embeddings
         self.patch_embedding = nn.Conv3d(
