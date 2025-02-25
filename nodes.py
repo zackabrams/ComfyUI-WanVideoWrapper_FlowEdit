@@ -642,8 +642,8 @@ class WanVideoEmptyEmbeds:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-            "generation_width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 8, "tooltip": "Width of the image to encode"}),
-            "generation_height": ("INT", {"default": 480, "min": 64, "max": 29048, "step": 8, "tooltip": "Height of the image to encode"}),
+            "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 8, "tooltip": "Width of the image to encode"}),
+            "height": ("INT", {"default": 480, "min": 64, "max": 29048, "step": 8, "tooltip": "Height of the image to encode"}),
             "num_frames": ("INT", {"default": 81, "min": 5, "max": 10000, "step": 4, "tooltip": "Number of frames to encode"}),
             },
         }
@@ -653,14 +653,14 @@ class WanVideoEmptyEmbeds:
     FUNCTION = "process"
     CATEGORY = "WanVideoWrapper"
 
-    def process(self, num_frames, generation_width, generation_height):
+    def process(self, num_frames, width, height):
 
         patch_size = (1, 2, 2)
         vae_stride = (4, 8, 8)
 
         target_shape = (16, (num_frames - 1) // vae_stride[0] + 1,
-                        generation_height // vae_stride[1],
-                        generation_width // vae_stride[2])
+                        height // vae_stride[1],
+                        width // vae_stride[2])
 
         seq_len = math.ceil((target_shape[2] * target_shape[3]) /
                             (patch_size[1] * patch_size[2]) *
