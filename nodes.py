@@ -401,11 +401,7 @@ class WanVideoTorchCompileSettings:
                 "mode": (["default", "max-autotune", "max-autotune-no-cudagraphs", "reduce-overhead"], {"default": "default"}),
                 "dynamic": ("BOOLEAN", {"default": False, "tooltip": "Enable dynamic mode"}),
                 "dynamo_cache_size_limit": ("INT", {"default": 64, "min": 0, "max": 1024, "step": 1, "tooltip": "torch._dynamo.config.cache_size_limit"}),
-                "compile_single_blocks": ("BOOLEAN", {"default": True, "tooltip": "Compile single blocks"}),
-                "compile_double_blocks": ("BOOLEAN", {"default": True, "tooltip": "Compile double blocks"}),
-                "compile_txt_in": ("BOOLEAN", {"default": False, "tooltip": "Compile txt_in layers"}),
-                "compile_vector_in": ("BOOLEAN", {"default": False, "tooltip": "Compile vector_in layers"}),
-                "compile_final_layer": ("BOOLEAN", {"default": False, "tooltip": "Compile final layer"}),
+                "compile_transformer_blocks": ("BOOLEAN", {"default": True, "tooltip": "Compile single blocks"}),
 
             },
         }
@@ -415,7 +411,7 @@ class WanVideoTorchCompileSettings:
     CATEGORY = "WanVideoWrapper"
     DESCRIPTION = "torch.compile settings, when connected to the model loader, torch.compile of the selected layers is attempted. Requires Triton and torch 2.5.0 is recommended"
 
-    def loadmodel(self, backend, fullgraph, mode, dynamic, dynamo_cache_size_limit, compile_single_blocks, compile_double_blocks, compile_txt_in, compile_vector_in, compile_final_layer):
+    def loadmodel(self, backend, fullgraph, mode, dynamic, dynamo_cache_size_limit, compile_transformer_blocks):
 
         compile_args = {
             "backend": backend,
@@ -423,11 +419,7 @@ class WanVideoTorchCompileSettings:
             "mode": mode,
             "dynamic": dynamic,
             "dynamo_cache_size_limit": dynamo_cache_size_limit,
-            "compile_single_blocks": compile_single_blocks,
-            "compile_double_blocks": compile_double_blocks,
-            "compile_txt_in": compile_txt_in,
-            "compile_vector_in": compile_vector_in,
-            "compile_final_layer": compile_final_layer
+            "compile_transformer_blocks": compile_transformer_blocks,
         }
 
         return (compile_args, )
