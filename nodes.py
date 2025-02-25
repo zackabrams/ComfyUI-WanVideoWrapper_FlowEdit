@@ -697,13 +697,13 @@ class WanVideoSampler:
 
 
             },
-            # "optional": {
-            #     #"samples": ("LATENT", {"tooltip": "init Latents to use for video2video process"} ),
-            #     #"image_cond_latents": ("LATENT", {"tooltip": "init Latents to use for image2video process"} ),
-            #     #"denoise_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+            "optional": {
+                "samples": ("LATENT", {"tooltip": "init Latents to use for video2video process"} ),
+                #"image_cond_latents": ("LATENT", {"tooltip": "init Latents to use for image2video process"} ),
+                "denoise_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 
-            #     #"riflex_freq_index": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1, "tooltip": "Frequency index for RIFLEX, disabled when 0, default 4. Allows for new frames to be generated after 129 without looping"}),
-            # }
+                #"riflex_freq_index": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1, "tooltip": "Frequency index for RIFLEX, disabled when 0, default 4. Allows for new frames to be generated after 129 without looping"}),
+            }
         }
 
     RETURN_TYPES = ("LATENT",)
@@ -711,7 +711,7 @@ class WanVideoSampler:
     FUNCTION = "process"
     CATEGORY = "WanVideoWrapper"
 
-    def process(self, model, text_embeds, image_embeds, shift, steps, cfg, seed, scheduler, riflex_freq_index, force_offload=True):
+    def process(self, model, text_embeds, image_embeds, shift, steps, cfg, seed, scheduler, riflex_freq_index, force_offload=True, samples=None, denoise_strength=1.0):
         patcher = model
         model = model.model
         transformer = model.diffusion_model
@@ -762,6 +762,8 @@ class WanVideoSampler:
 
         #for name, param in transformer.named_parameters():
         #    print(name, param.data.device)
+        
+        steps = int(steps/denoise_strength)
 
         if scheduler == 'unipc':
             sample_scheduler = FlowUniPCMultistepScheduler(
@@ -789,6 +791,9 @@ class WanVideoSampler:
         else:
             raise NotImplementedError("Unsupported solver.")
         
+        if denoise_strength < 1.0:
+            steps = int(steps * denoise_strength)
+            timesteps = timesteps[-(steps + 1):]        
         
         seed_g = torch.Generator(device=torch.device("cpu"))
         seed_g.manual_seed(seed)
@@ -814,6 +819,10 @@ class WanVideoSampler:
                     device=torch.device("cpu"),
                     generator=seed_g)
 
+        if samples is not None:
+            latent_timestep = timesteps[:1].to(noise)
+            noise = noise * latent_timestep / 1000 + (1 - latent_timestep / 1000) * samples["samples"].squeeze(0).to(noise)
+            
         latent = noise.to(device)
 
         d = transformer.dim // transformer.num_heads
@@ -823,6 +832,10 @@ class WanVideoSampler:
             rope_params(1024, 2 * (d // 6), L_test=latent.shape[2], k=riflex_freq_index)
         ],
         dim=1)
+
+        if not isinstance(cfg, list):
+            cfg = [cfg] * (steps +1)
+        print(cfg)
 
         base_args = {
             'clip_fea': image_embeds.get('clip_context', None),
@@ -855,12 +868,14 @@ class WanVideoSampler:
 
                 noise_pred_cond = transformer(
                     latent_model_input, t=timestep, **arg_c)[0].to(offload_device)
-            
-                noise_pred_uncond = transformer(
-                    latent_model_input, t=timestep, **arg_null)[0].to(offload_device)
-                    
-                noise_pred = noise_pred_uncond + cfg * (
-                    noise_pred_cond - noise_pred_uncond)
+                if cfg[i] >= 1.0:
+                    noise_pred_uncond = transformer(
+                        latent_model_input, t=timestep, **arg_null)[0].to(offload_device)
+                
+                    noise_pred = noise_pred_uncond + cfg[i] * (
+                        noise_pred_cond - noise_pred_uncond)
+                else:
+                    noise_pred = noise_pred_cond
                 
                 latent = latent.to(offload_device)
                 
@@ -875,9 +890,6 @@ class WanVideoSampler:
                 x0 = [latent.to(device)]
                 
                 if callback is not None:
-                    print(t)
-                    print("latent_model_input", latent_model_input[0].shape)
-                    print("noise_pred", noise_pred.shape)
                     callback_latent = (latent_model_input[0].cpu() - noise_pred * t.cpu() / 1000).detach().permute(1,0,2,3)
                     callback(i, callback_latent, None, steps)
                 else:
