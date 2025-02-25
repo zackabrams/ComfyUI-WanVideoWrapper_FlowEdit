@@ -2,6 +2,15 @@
 
 # WORK IN PROGRESS
 
+# Installation
+1. Clone this repo into `custom_nodes` folder.
+2. Install dependencies: `pip install -r requirements.txt`
+   or if you use the portable install, run this in ComfyUI_windows_portable -folder:
+
+  `python_embeded\python.exe -m pip install -r ComfyUI\custom_nodes\ComfyUI-WanVideoWrapper\requirements.txt`
+
+## Models
+
 https://huggingface.co/Kijai/WanVideo_comfy/tree/main
 
 Text encoders to `ComfyUI/models/text_encoders`
@@ -12,7 +21,7 @@ Vae to `ComfyUI/models/vae`
 
 Right now I have only ran the I2V model succesfully.
 
-Can't get frame counts under 81 to work, this was 512x512x81
+This test was 512x512x81
 
 ~16GB used with 20/40 blocks offloaded
 

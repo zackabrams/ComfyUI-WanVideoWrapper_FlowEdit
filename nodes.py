@@ -108,34 +108,13 @@ class WanVideoModel(comfy.model_base.BaseModel):
         self.pipeline[k] = v
 
 from comfy.latent_formats import LatentFormat
-class WanVideo(LatentFormat):
-    latent_channels = 16
-    latent_dimensions = 3
-    scale_factor = 1
-    latent_rgb_factors = [[0.00015850099142733433, -0.00022336468679047376, 0.0012986971243192447], 
-                              [0.0005663412275114018, 0.0007861870689866654, 0.0019476977664748178], 
-                              [0.0015309811379193067, -0.00033673814517196977, 0.0008630955780593666], 
-                              [0.0018870473626590339, 0.002189569168822193, 0.002116887481625339], 
-                              [0.0020317996817509638, 0.0007815605945740026, -0.0005115450818442968], 
-                              [0.0016342762423795499, 0.0012601010475289658, 0.0016851194126694853], 
-                              [0.0013595118767078232, -0.0002916941854044625, 0.00018943102991771045], 
-                              [0.001410154384770368, 0.0007686194765380242, 0.001934588961229726], 
-                              [-0.00036535934889578086, 0.00021113539535803916, 0.00039667130378409675], 
-                              [-9.082161140163455e-05, 0.0013325911783233892, 0.001812325948391347], 
-                              [0.00020121251545686565, 0.0018655655639155274, 0.0005459994991828317], 
-                              [0.0018891414023764184, 0.0005440105401015541, -0.0002365743607780385], 
-                              [0.0017790556111146022, 2.214497568459961e-05, 0.0017639757911266463], 
-                              [0.001456174042709703, 0.00043078224591916133, 0.0015744138130009018], 
-                              [0.0017913272306190463, 0.0017379684971510461, -0.00012070215501199769], 
-                              [-3.400939289556232e-05, -0.0004053172077750597, 0.0007082065661536516]]
 
-    latent_rgb_factors_bias = [-0.0011, 0.0, -0.0002]
 
 class WanVideoModelConfig:
     def __init__(self, dtype):
         self.unet_config = {}
         self.unet_extra_config = {}
-        self.latent_format = WanVideo #todo: change to WanVideo
+        self.latent_format = comfy.latent_formats.HunyuanVideo #todo better values
         self.latent_format.latent_channels = 16
         self.manual_cast_dtype = dtype
         self.sampling_settings = {"multiplier": 1.0}
@@ -248,6 +227,7 @@ class WanVideoModelLoader:
                 set_module_tensor_to_device(transformer, name, device=transformer_load_device, dtype=dtype_to_use, value=sd[name])
 
             comfy_model.diffusion_model = transformer
+            comfy_model.load_device = transformer_load_device
             patcher = comfy.model_patcher.ModelPatcher(comfy_model, device, offload_device)
 
             del sd
@@ -375,7 +355,7 @@ class WanVideoVAELoader:
             }
         }
 
-    RETURN_TYPES = ("VAE",)
+    RETURN_TYPES = ("WANVAE",)
     RETURN_NAMES = ("vae", )
     FUNCTION = "loadmodel"
     CATEGORY = "WanVideoWrapper"
@@ -569,7 +549,7 @@ class WanVideoImageClipEncode:
         return {"required": {
             "clip": ("WANCLIP",),
             "image": ("IMAGE", {"tooltip": "Image to encode"}),
-            "vae": ("VAE",),
+            "vae": ("WANVAE",),
             "generation_width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 8, "tooltip": "Width of the image to encode"}),
             "generation_height": ("INT", {"default": 480, "min": 64, "max": 29048, "step": 8, "tooltip": "Height of the image to encode"}),
             "num_frames": ("INT", {"default": 81, "min": 5, "max": 10000, "step": 4, "tooltip": "Number of frames to encode"}),
@@ -728,6 +708,7 @@ class WanVideoSampler:
     CATEGORY = "WanVideoWrapper"
 
     def process(self, model, text_embeds, image_embeds, shift, steps, cfg, seed, scheduler, riflex_freq_index, force_offload=True):
+        patcher = model
         model = model.model
         transformer = model.diffusion_model
 
@@ -858,9 +839,8 @@ class WanVideoSampler:
         
         pbar = ProgressBar(steps)
 
-        #from latent_preview import prepare_callback
-        #callback = prepare_callback(self.comfy_model, steps)
-        callback=None
+        from latent_preview import prepare_callback
+        callback = prepare_callback(patcher, steps)
 
         with torch.autocast(device_type=mm.get_autocast_device(device), dtype=model["dtype"], enabled=True):
             for i, t in enumerate(tqdm(timesteps)):
@@ -889,17 +869,16 @@ class WanVideoSampler:
                 latent = temp_x0.squeeze(0)
 
                 x0 = [latent.to(device)]
-                del latent_model_input, timestep
+                
                 if callback is not None:
-                    callback_latent = (latent_model_input[:, :16, :, :, :] - noise_pred * t / 1000).detach()[0].permute(1,0,2,3)
-                    callback(
-                        i, 
-                        callback_latent,
-                        None, 
-                        steps
-                    )
+                    print(t)
+                    print("latent_model_input", latent_model_input[0].shape)
+                    print("noise_pred", noise_pred.shape)
+                    callback_latent = (latent_model_input[0].cpu() - noise_pred * t.cpu() / 1000).detach().permute(1,0,2,3)
+                    callback(i, callback_latent, None, steps)
                 else:
                     pbar.update(1)
+                del latent_model_input, timestep
 
         if force_offload:
             transformer.to(offload_device)
@@ -921,7 +900,7 @@ class WanVideoDecode:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-                    "vae": ("VAE",),
+                    "vae": ("WANVAE",),
                     "samples": ("LATENT",),
                     "enable_vae_tiling": ("BOOLEAN", {"default": True, "tooltip": "Drastically reduces memory use but may introduce seams"}),
                     "tile_x": ("INT", {"default": 272, "min": 64, "max": 2048, "step": 1, "tooltip": "Tile size in pixels, smaller values use less VRAM, may introduce more seams"}),
@@ -963,7 +942,7 @@ class WanVideoEncode:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-                    "vae": ("VAE",),
+                    "vae": ("WANVAE",),
                     "image": ("IMAGE",),
                     "enable_vae_tiling": ("BOOLEAN", {"default": True, "tooltip": "Drastically reduces memory use but may introduce seams"}),
                     "tile_x": ("INT", {"default": 272, "min": 64, "max": 2048, "step": 1, "tooltip": "Tile size in pixels, smaller values use less VRAM, may introduce more seams"}),
@@ -1030,22 +1009,24 @@ class WanVideoLatentPreview:
         latents = samples["samples"].clone()
         print("in sample", latents.shape)
         #latent_rgb_factors =[[-0.02531045419704009, -0.00504800612542497, 0.13293717293982546], [-0.03421835830845858, 0.13996708548892614, -0.07081038680118075], [0.011091819063647063, -0.03372949685846012, -0.0698232210116172], [-0.06276524604742019, -0.09322986677909442, 0.01826383612148913], [0.021290659938126788, -0.07719530444034409, -0.08247812477766273], [0.04401102991215147, -0.0026401932105894754, -0.01410913586718443], [0.08979717602613707, 0.05361221258740831, 0.11501425309699129], [0.04695121980405198, -0.13053491609675175, 0.05025986885867986], [-0.09704684176098193, 0.03397687417738002, -0.1105886644677771], [0.14694697234804935, -0.12316902186157716, 0.04210404546699645], [0.14432470831243552, -0.002580008133591355, -0.08490676947390643], [0.051502750076553944, -0.10071695490292451, -0.01786223610178095], [-0.12503276881774464, 0.08877830923879379, 0.1076584501927316], [-0.020191205513213406, -0.1493425056303128, -0.14289740371758308], [-0.06470138952271293, -0.07410426095060325, 0.00980804676890873], [0.11747671720735695, 0.10916082743849789, -0.12235599365235904]]
-        latent_rgb_factors = [[0.00015850099142733433, -0.00022336468679047376, 0.0012986971243192447], 
-                              [0.0005663412275114018, 0.0007861870689866654, 0.0019476977664748178], 
-                              [0.0015309811379193067, -0.00033673814517196977, 0.0008630955780593666], 
-                              [0.0018870473626590339, 0.002189569168822193, 0.002116887481625339], 
-                              [0.0020317996817509638, 0.0007815605945740026, -0.0005115450818442968], 
-                              [0.0016342762423795499, 0.0012601010475289658, 0.0016851194126694853], 
-                              [0.0013595118767078232, -0.0002916941854044625, 0.00018943102991771045], 
-                              [0.001410154384770368, 0.0007686194765380242, 0.001934588961229726], 
-                              [-0.00036535934889578086, 0.00021113539535803916, 0.00039667130378409675], 
-                              [-9.082161140163455e-05, 0.0013325911783233892, 0.001812325948391347], 
-                              [0.00020121251545686565, 0.0018655655639155274, 0.0005459994991828317], 
-                              [0.0018891414023764184, 0.0005440105401015541, -0.0002365743607780385], 
-                              [0.0017790556111146022, 2.214497568459961e-05, 0.0017639757911266463], 
-                              [0.001456174042709703, 0.00043078224591916133, 0.0015744138130009018], 
-                              [0.0017913272306190463, 0.0017379684971510461, -0.00012070215501199769], 
-                              [-3.400939289556232e-05, -0.0004053172077750597, 0.0007082065661536516]]
+        latent_rgb_factors = [
+        [0.000159, -0.000223, 0.001299],
+        [0.000566, 0.000786, 0.001948],
+        [0.001531, -0.000337, 0.000863],
+        [0.001887, 0.002190, 0.002117],
+        [0.002032, 0.000782, -0.000512],
+        [0.001634, 0.001260, 0.001685],
+        [0.001360, -0.000292, 0.000189],
+        [0.001410, 0.000769, 0.001935],
+        [-0.000365, 0.000211, 0.000397],
+        [-0.000091, 0.001333, 0.001812],
+        [0.000201, 0.001866, 0.000546],
+        [0.001889, 0.000544, -0.000237],
+        [0.001779, 0.000022, 0.001764],
+        [0.001456, 0.000431, 0.001574],
+        [0.001791, 0.001738, -0.000121],
+        [-0.000034, -0.000405, 0.000708]
+    ]
 
         import random
         random.seed(seed)
@@ -1059,6 +1040,7 @@ class WanVideoLatentPreview:
 
         latent_rgb_factors = torch.tensor(latent_rgb_factors, device=latents.device, dtype=latents.dtype).transpose(0, 1)
         latent_rgb_factors_bias = torch.tensor(latent_rgb_factors_bias, device=latents.device, dtype=latents.dtype)
+        print(latent_rgb_factors)
 
         print("latent_rgb_factors", latent_rgb_factors.shape)
 
