@@ -20,6 +20,8 @@ __all__ = [
 from accelerate import init_empty_weights
 from accelerate.utils import set_module_tensor_to_device
 
+import comfy.model_management as mm
+
 def pos_interpolate(pos, seq_len):
     if pos.size(1) == seq_len:
         return pos
@@ -529,6 +531,6 @@ class CLIPModel:
 
     def visual(self, image):
         # forward
-        with torch.cuda.amp.autocast(dtype=self.dtype):
+        with torch.autocast(device_type=mm.get_autocast_device(self.device), dtype=self.dtype):
             out = self.model.visual(image, use_31_block=True)
             return out

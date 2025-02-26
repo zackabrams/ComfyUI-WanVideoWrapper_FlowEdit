@@ -480,7 +480,7 @@ class T5EncoderModel:
         device=torch.cuda.current_device(),
         state_dict=None,
         tokenizer_path=None,
-        shard_fn=None,
+        quantization="disabled",
     ):
         self.text_len = text_len
         self.dtype = dtype
@@ -494,9 +494,16 @@ class T5EncoderModel:
                 return_tokenizer=False,
                 dtype=dtype,
                 device=device).eval().requires_grad_(False)
-            
+        
+        if quantization == "fp8_e4m3fn":
+            cast_dtype = torch.float8_e4m3fn
+        else:
+            cast_dtype = dtype
+
+        params_to_keep = {'norm', 'pos_embedding', 'token_embedding'}
         for name, param in model.named_parameters():
-            set_module_tensor_to_device(model, name, device=device, dtype=dtype, value=state_dict[name])
+            dtype_to_use = dtype if any(keyword in name for keyword in params_to_keep) else cast_dtype
+            set_module_tensor_to_device(model, name, device=device, dtype=dtype_to_use, value=state_dict[name])
 
         #model.load_state_dict(state_dict)
         self.model = model

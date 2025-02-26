@@ -498,12 +498,13 @@ class LoadWanVideoT5TextEncoder:
         return {
             "required": {
                 "model_name": (folder_paths.get_filename_list("text_encoders"), {"tooltip": "These models are loaded from 'ComfyUI/models/vae'"}),
-                 "precision": (["fp16", "fp32", "bf16"],
+                "precision": (["fp16", "fp32", "bf16"],
                     {"default": "bf16"}
                 ),
             },
             "optional": {
                 "load_device": (["main_device", "offload_device"], {"default": "offload_device"}),
+                 "quantization": (['disabled', 'fp8_e4m3fn'], {"default": 'disabled', "tooltip": "optional quantization method"}),
             }
         }
 
@@ -513,7 +514,7 @@ class LoadWanVideoT5TextEncoder:
     CATEGORY = "WanVideoWrapper"
     DESCRIPTION = "Loads Hunyuan text_encoder model from 'ComfyUI/models/LLM'"
 
-    def loadmodel(self, model_name, precision, load_device="offload_device"):
+    def loadmodel(self, model_name, precision, load_device="offload_device", quantization="disabled"):
        
         device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
@@ -533,9 +534,14 @@ class LoadWanVideoT5TextEncoder:
             device=text_encoder_load_device,
             state_dict=sd,
             tokenizer_path=tokenizer_path,
+            quantization=quantization
         )
+        text_encoder = {
+            "model": T5_text_encoder,
+            "dtype": dtype,
+        }
         
-        return (T5_text_encoder,)
+        return (text_encoder,)
     
 class LoadWanVideoClipTextEncoder:
     @classmethod
@@ -598,16 +604,19 @@ class WanVideoTextEncode:
 
         device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
+        encoder = t5["model"]
+        dtype = t5["dtype"]
 
-        t5.model.to(device)
+        encoder.model.to(device)
        
-        context = t5([positive_prompt], device)
-        context_null = t5([negative_prompt], device)
+        with torch.autocast(device_type=mm.get_autocast_device(device), dtype=dtype, enabled=True):
+            context = encoder([positive_prompt], device)
+            context_null = encoder([negative_prompt], device)
         context = [t.to(device) for t in context]
         context_null = [t.to(device) for t in context_null]
 
         if force_offload:
-            t5.model.to(offload_device)
+            encoder.model.to(offload_device)
 
 
         prompt_embeds_dict = {
