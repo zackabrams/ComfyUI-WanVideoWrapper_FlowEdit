@@ -11,6 +11,7 @@ from .attention import attention
 
 __all__ = ['WanModel']
 
+from tqdm import tqdm
 
 def sinusoidal_embedding_1d(dim, position):
     # preprocess
@@ -503,12 +504,10 @@ class WanModel(ModelMixin, ConfigMixin):
         print(f"Swapping {blocks_to_swap + 1} transformer blocks")
         self.blocks_to_swap = blocks_to_swap
        
-        for b, block in enumerate(self.blocks):
+        for b, block in tqdm(enumerate(self.blocks), total=len(self.blocks), desc="Initializing block swap"):
             if b > self.blocks_to_swap:
-                print(f"Moving transformer block {b} to main device")
                 block.to(self.main_device)
             else:
-                print(f"Moving transformer block {b} to offload_device")
                 block.to(self.offload_device)
 
     def forward(
