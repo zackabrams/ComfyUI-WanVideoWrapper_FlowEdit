@@ -626,26 +626,26 @@ class WanModel(ModelMixin, ConfigMixin):
             out.append(u)
         return out
 
-    def init_weights(self):
-        r"""
-        Initialize model parameters using Xavier initialization.
-        """
+    # def init_weights(self):
+    #     r"""
+    #     Initialize model parameters using Xavier initialization.
+    #     """
 
-        # basic init
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                if m.bias is not None:
-                    nn.init.zeros_(m.bias)
+    #     # basic init
+    #     for m in self.modules():
+    #         if isinstance(m, nn.Linear):
+    #             nn.init.xavier_uniform_(m.weight)
+    #             if m.bias is not None:
+    #                 nn.init.zeros_(m.bias)
 
-        # init embeddings
-        nn.init.xavier_uniform_(self.patch_embedding.weight.flatten(1))
-        for m in self.text_embedding.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, std=.02)
-        for m in self.time_embedding.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, std=.02)
+    #     # init embeddings
+    #     nn.init.xavier_uniform_(self.patch_embedding.weight.flatten(1))
+    #     for m in self.text_embedding.modules():
+    #         if isinstance(m, nn.Linear):
+    #             nn.init.normal_(m.weight, std=.02)
+    #     for m in self.time_embedding.modules():
+    #         if isinstance(m, nn.Linear):
+    #             nn.init.normal_(m.weight, std=.02)
 
-        # init output layer
-        nn.init.zeros_(self.head.head.weight)
+    #     # init output layer
+    #     nn.init.zeros_(self.head.head.weight)
