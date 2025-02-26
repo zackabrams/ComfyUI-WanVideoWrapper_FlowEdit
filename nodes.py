@@ -769,10 +769,7 @@ class WanVideoSampler:
             },
             "optional": {
                 "samples": ("LATENT", {"tooltip": "init Latents to use for video2video process"} ),
-                #"image_cond_latents": ("LATENT", {"tooltip": "init Latents to use for image2video process"} ),
                 "denoise_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                
-                #"riflex_freq_index": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1, "tooltip": "Frequency index for RIFLEX, disabled when 0, default 4. Allows for new frames to be generated after 129 without looping"}),
             }
         }
 
@@ -788,51 +785,6 @@ class WanVideoSampler:
 
         device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
-
-        if model["block_swap_args"] is not None:
-            for name, param in transformer.named_parameters():
-                if "block" not in name:
-                    param.data = param.data.to(device)
-
-            transformer.block_swap(
-                model["block_swap_args"]["blocks_to_swap"] - 1 ,
-            )
-        else:
-            if model["manual_offloading"]:
-                transformer.to(device)
-
-
-        # # Initialize TeaCache if enabled
-        # if teacache_args is not None:
-        #     # Check if dimensions have changed since last run
-        #     if (not hasattr(transformer, 'last_dimensions') or
-        #             transformer.last_dimensions != (height, width, num_frames) or
-        #             not hasattr(transformer, 'last_frame_count') or
-        #             transformer.last_frame_count != num_frames):
-        #         # Reset TeaCache state on dimension change
-        #         transformer.cnt = 0
-        #         transformer.accumulated_rel_l1_distance = 0
-        #         transformer.previous_modulated_input = None
-        #         transformer.previous_residual = None
-        #         transformer.last_dimensions = (height, width, num_frames)
-        #         transformer.last_frame_count = num_frames
-
-        #     transformer.enable_teacache = True
-        #     transformer.num_steps = steps
-        #     transformer.rel_l1_thresh = teacache_args["rel_l1_thresh"]
-        # else:
-        #     transformer.enable_teacache = False
-
-        mm.soft_empty_cache()
-        gc.collect()
-
-        try:
-            torch.cuda.reset_peak_memory_stats(device)
-        except:
-            pass
-
-        #for name, param in transformer.named_parameters():
-        #    print(name, param.data.device)
         
         steps = int(steps/denoise_strength)
 
@@ -869,11 +821,15 @@ class WanVideoSampler:
         seed_g = torch.Generator(device=torch.device("cpu"))
         seed_g.manual_seed(seed)
         if transformer.model_type == "i2v":
+            lat_h = image_embeds.get("lat_h", None)
+            lat_w = image_embeds.get("lat_w", None)
+            if lat_h is None or lat_w is None:
+                raise ValueError("Clip encoded image embeds must be provided for i2v model")
             noise = torch.randn(
                 16,
                 (image_embeds["num_frames"] - 1) // 4 + 1,
-                image_embeds["lat_h"],
-                image_embeds["lat_w"],
+                lat_h,
+                lat_w,
                 dtype=torch.float32,
                 generator=seed_g,
                 device=torch.device("cpu"))
@@ -906,7 +862,6 @@ class WanVideoSampler:
 
         if not isinstance(cfg, list):
             cfg = [cfg] * (steps +1)
-        print(cfg)
 
         base_args = {
             'clip_fea': image_embeds.get('clip_context', None),
@@ -929,6 +884,27 @@ class WanVideoSampler:
 
         from latent_preview import prepare_callback
         callback = prepare_callback(patcher, steps)
+
+        #blockswap init
+        if model["block_swap_args"] is not None:
+            for name, param in transformer.named_parameters():
+                if "block" not in name:
+                    param.data = param.data.to(device)
+
+            transformer.block_swap(
+                model["block_swap_args"]["blocks_to_swap"] - 1 ,
+            )
+        else:
+            if model["manual_offloading"]:
+                transformer.to(device)
+
+        mm.soft_empty_cache()
+        gc.collect()
+
+        try:
+            torch.cuda.reset_peak_memory_stats(device)
+        except:
+            pass
 
         with torch.autocast(device_type=mm.get_autocast_device(device), dtype=model["dtype"], enabled=True):
             for i, t in enumerate(tqdm(timesteps)):
