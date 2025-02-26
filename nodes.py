@@ -577,7 +577,8 @@ class LoadWanVideoClipTextEncoder:
 
         model_path = folder_paths.get_full_path("text_encoders", model_name)
         sd = load_torch_file(model_path, safe_load=True)
-        clip_model = CLIPModel(dtype=dtype, device=text_encoder_load_device, state_dict=sd, tokenizer_path=tokenizer_path)
+        clip_model = CLIPModel(dtype=dtype, device=device, state_dict=sd, tokenizer_path=tokenizer_path)
+        clip_model.model.to(text_encoder_load_device)
         del sd
         
         return (clip_model,)
