@@ -637,7 +637,7 @@ class WanVideoImageClipEncode:
             "vae": ("WANVAE",),
             "generation_width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 8, "tooltip": "Width of the image to encode"}),
             "generation_height": ("INT", {"default": 480, "min": 64, "max": 29048, "step": 8, "tooltip": "Height of the image to encode"}),
-            "num_frames": ("INT", {"default": 81, "min": 5, "max": 10000, "step": 4, "tooltip": "Number of frames to encode"}),
+            "num_frames": ("INT", {"default": 81, "min": 1, "max": 10000, "step": 4, "tooltip": "Number of frames to encode"}),
             },
             "optional": {
                 "force_offload": ("BOOLEAN", {"default": True}),
@@ -740,7 +740,7 @@ class WanVideoEmptyEmbeds:
         return {"required": {
             "width": ("INT", {"default": 832, "min": 64, "max": 2048, "step": 8, "tooltip": "Width of the image to encode"}),
             "height": ("INT", {"default": 480, "min": 64, "max": 29048, "step": 8, "tooltip": "Height of the image to encode"}),
-            "num_frames": ("INT", {"default": 81, "min": 5, "max": 10000, "step": 4, "tooltip": "Number of frames to encode"}),
+            "num_frames": ("INT", {"default": 81, "min": 1, "max": 10000, "step": 4, "tooltip": "Number of frames to encode"}),
             },
         }
 
