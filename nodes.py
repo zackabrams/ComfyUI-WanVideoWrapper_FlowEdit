@@ -25,13 +25,8 @@ import comfy.latent_formats
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 def add_noise_to_reference_video(image, ratio=None):
-    if ratio is None:
-        sigma = torch.normal(mean=-3.0, std=0.5, size=(image.shape[0],)).to(image.device)
-        sigma = torch.exp(sigma).to(image.dtype)
-    else:
-        sigma = torch.ones((image.shape[0],)).to(image.device, image.dtype) * ratio
-    
-    image_noise = torch.randn_like(image) * sigma[:, None, None, None, None]
+    sigma = torch.ones((image.shape[0],)).to(image.device, image.dtype) * ratio 
+    image_noise = torch.randn_like(image) * sigma[:, None, None, None]
     image_noise = torch.where(image==-1, torch.zeros_like(image), image_noise)
     image = image + image_noise
     return image
@@ -641,6 +636,10 @@ class WanVideoImageClipEncode:
             },
             "optional": {
                 "force_offload": ("BOOLEAN", {"default": True}),
+                "noise_aug_strength": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 10.0, "step": 0.001, "tooltip": "Strength of noise augmentation, helpful for I2V where some noise can add motion and give sharper results"}),
+                "latent_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.001, "tooltip": "Additional latent multiplier, helpful for I2V where lower values allow for more motion"}),
+                "clip_embed_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.001, "tooltip": "Additional clip embed multiplier"}),
+
             }
         }
 
@@ -649,7 +648,7 @@ class WanVideoImageClipEncode:
     FUNCTION = "process"
     CATEGORY = "WanVideoWrapper"
 
-    def process(self, clip, vae, image, num_frames, generation_width, generation_height, force_offload=True):
+    def process(self, clip, vae, image, num_frames, generation_width, generation_height, force_offload=True, noise_aug_strength=0.0, latent_strength=1.0, clip_embed_strength=1.0):
 
         device = mm.get_torch_device()
         offload_device = mm.unet_offload_device()
@@ -666,6 +665,10 @@ class WanVideoImageClipEncode:
         pixel_values = clip_preprocess(image.to(device), size=224, mean=self.image_mean, std=self.image_std, crop=True).float()
         clip.model.to(device)
         clip_context = clip.visual(pixel_values)
+
+        if clip_embed_strength != 1.0:
+            clip_context *= clip_embed_strength
+        
         if force_offload:
             clip.model.to(offload_device)
             mm.soft_empty_cache()
@@ -711,11 +714,15 @@ class WanVideoImageClipEncode:
         resized_image = resized_image.transpose(0, 1)  # Transpose to match required format
         resized_image = resized_image * 2 - 1
 
+        if noise_aug_strength > 0.0:
+            resized_image = add_noise_to_reference_video(resized_image, ratio=noise_aug_strength)
+        
         # Step 2: Create zero padding frames
         zero_frames = torch.zeros(3, num_frames-1, h, w, device=device)
 
         # Step 3: Concatenate image with zero frames
         concatenated = torch.concat([resized_image.to(device), zero_frames, resized_image.to(device)], dim=1).to(device = device, dtype = vae.dtype)
+        concatenated *= latent_strength
         y = vae.encode([concatenated], device)[0]
 
         y = torch.concat([mask, y])
