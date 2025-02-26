@@ -239,6 +239,7 @@ class WanVideoModelLoader:
 
             if quantization == "fp8_e4m3fn_fast":
                 from .fp8_optimization import convert_fp8_linear
+                params_to_keep.update({"ff"})
                 convert_fp8_linear(patcher.model.diffusion_model, base_dtype, params_to_keep=params_to_keep)
 
             #compile
@@ -868,7 +869,7 @@ class WanVideoSampler:
 
                 noise_pred_cond = transformer(
                     latent_model_input, t=timestep, **arg_c)[0].to(offload_device)
-                if cfg[i] >= 1.0:
+                if cfg[i] != 1.0:
                     noise_pred_uncond = transformer(
                         latent_model_input, t=timestep, **arg_null)[0].to(offload_device)
                 
