@@ -18,7 +18,7 @@ from accelerate.utils import set_module_tensor_to_device
 
 import folder_paths
 import comfy.model_management as mm
-from comfy.utils import load_torch_file, save_torch_file, ProgressBar
+from comfy.utils import load_torch_file, save_torch_file, ProgressBar, common_upscale
 import comfy.model_base
 import comfy.latent_formats
 
@@ -680,33 +680,46 @@ class WanVideoImageClipEncode:
         h = lat_h * vae_stride[1]
         w = lat_w * vae_stride[2]
 
-        msk = torch.ones(1, num_frames, lat_h, lat_w, device=device)
-        msk[:, 1:] = 0
-        msk = torch.concat([
-            torch.repeat_interleave(msk[:, 0:1], repeats=4, dim=1), msk[:, 1:]
-        ],
-                           dim=1)
-        msk = msk.view(1, msk.shape[1] // 4, 4, lat_h, lat_w)
-        msk = msk.transpose(1, 2)[0]
+        # Step 1: Create initial mask with ones for first frame, zeros for others
+        mask = torch.ones(1, num_frames, lat_h, lat_w, device=device)
+        mask[:, 1:] = 0
 
-        max_seq_len = ((num_frames - 1) // vae_stride[0] + 1) * lat_h * lat_w // (
-            patch_size[1] * patch_size[2])
-        max_seq_len = int(math.ceil(max_seq_len / sp_size)) * sp_size
+        # Step 2: Repeat first frame 4 times and concatenate with remaining frames
+        first_frame_repeated = torch.repeat_interleave(mask[:, 0:1], repeats=4, dim=1)
+        mask = torch.concat([first_frame_repeated, mask[:, 1:]], dim=1)
+
+        # Step 3: Reshape mask into groups of 4 frames
+        mask = mask.view(1, mask.shape[1] // 4, 4, lat_h, lat_w)
+
+        # Step 4: Transpose dimensions and select first batch
+        mask = mask.transpose(1, 2)[0]
+
+        # Calculate maximum sequence length
+        frames_per_stride = (num_frames - 1) // vae_stride[0] + 1
+        patches_per_frame = lat_h * lat_w // (patch_size[1] * patch_size[2])
+        raw_seq_len = frames_per_stride * patches_per_frame
+
+        # Round up to nearest multiple of sp_size
+        max_seq_len = int(math.ceil(raw_seq_len / sp_size)) * sp_size
 
         vae.to(device)
 
-        image = image.to(device = device, dtype = vae.dtype) * 2 - 1
+        # Step 1: Resize and rearrange the input image dimensions
+        #resized_image = image.permute(0, 3, 1, 2)  # Rearrange dimensions to (B, C, H, W)
+        #resized_image = torch.nn.functional.interpolate(resized_image, size=(h, w), mode='bicubic')
+        resized_image = common_upscale(image.movedim(-1, 1), w, h, "lanczos", "disabled")
+        resized_image = resized_image.transpose(0, 1)  # Transpose to match required format
+        resized_image = resized_image * 2 - 1
 
-        y = vae.encode([
-            torch.concat([
-                torch.nn.functional.interpolate(
-                    image.permute(0, 3, 1, 2), size=(h, w), mode='bicubic').transpose(
-                        0, 1),
-                torch.zeros(3, num_frames-1, h, w, device=device)
-            ],
-                         dim=1).to(image)
-        ],device)[0]
-        y = torch.concat([msk, y])
+        # Step 2: Create zero padding frames
+        zero_frames = torch.zeros(3, num_frames-1, h, w, device=device)
+
+        # Step 3: Concatenate image with zero frames
+        concatenated = torch.concat([resized_image.to(device), zero_frames, resized_image.to(device)], dim=1).to(device = device, dtype = vae.dtype)
+        y = vae.encode([concatenated], device)[0]
+
+        y = torch.concat([mask, y])
+
         vae.to(offload_device)
 
         image_embeds = {

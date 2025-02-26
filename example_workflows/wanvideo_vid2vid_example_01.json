@@ -1,6 +1,6 @@
 {
   "last_node_id": 45,
-  "last_link_id": 55,
+  "last_link_id": 58,
   "nodes": [
     {
       "id": 33,
@@ -92,7 +92,7 @@
       ],
       "size": [
         377.1661376953125,
-        115.05413055419922
+        130
       ],
       "flags": {},
       "order": 3,
@@ -114,7 +114,8 @@
       "widgets_values": [
         "umt5-xxl-enc-bf16.safetensors",
         "bf16",
-        "offload_device"
+        "offload_device",
+        "disabled"
       ]
     },
     {
@@ -182,202 +183,6 @@
       ]
     },
     {
-      "id": 43,
-      "type": "VHS_LoadVideo",
-      "pos": [
-        570.141357421875,
-        292.6640625
-      ],
-      "size": [
-        247.455078125,
-        551.455078125
-      ],
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "meta_batch",
-          "type": "VHS_BatchManager",
-          "shape": 7,
-          "link": null
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "shape": 7,
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            51
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "frame_count",
-          "type": "INT",
-          "links": null
-        },
-        {
-          "name": "audio",
-          "type": "AUDIO",
-          "links": null
-        },
-        {
-          "name": "video_info",
-          "type": "VHS_VIDEOINFO",
-          "links": null
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "VHS_LoadVideo"
-      },
-      "widgets_values": {
-        "video": "wolf_interpolated.mp4",
-        "force_rate": 0,
-        "custom_width": 0,
-        "custom_height": 0,
-        "frame_load_cap": 0,
-        "skip_first_frames": 0,
-        "select_every_nth": 1,
-        "format": "AnimateDiff",
-        "choose video to upload": "image",
-        "videopreview": {
-          "hidden": false,
-          "paused": false,
-          "params": {
-            "filename": "wolf_interpolated.mp4",
-            "type": "input",
-            "format": "video/mp4",
-            "force_rate": 0,
-            "custom_width": 0,
-            "custom_height": 0,
-            "frame_load_cap": 0,
-            "skip_first_frames": 0,
-            "select_every_nth": 1
-          }
-        }
-      }
-    },
-    {
-      "id": 44,
-      "type": "ImageResizeKJ",
-      "pos": [
-        871.0767211914062,
-        291.94927978515625
-      ],
-      "size": [
-        315,
-        266
-      ],
-      "flags": {},
-      "order": 10,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 51
-        },
-        {
-          "name": "get_image_size",
-          "type": "IMAGE",
-          "shape": 7,
-          "link": null
-        },
-        {
-          "name": "width_input",
-          "type": "INT",
-          "shape": 7,
-          "widget": {
-            "name": "width_input"
-          },
-          "link": null
-        },
-        {
-          "name": "height_input",
-          "type": "INT",
-          "shape": 7,
-          "widget": {
-            "name": "height_input"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            52,
-            53
-          ],
-          "slot_index": 0
-        },
-        {
-          "name": "width",
-          "type": "INT",
-          "links": null
-        },
-        {
-          "name": "height",
-          "type": "INT",
-          "links": null
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ImageResizeKJ"
-      },
-      "widgets_values": [
-        512,
-        512,
-        "nearest-exact",
-        false,
-        2,
-        0,
-        0,
-        "disabled"
-      ]
-    },
-    {
-      "id": 37,
-      "type": "WanVideoEmptyEmbeds",
-      "pos": [
-        1305.26708984375,
-        -571.7843627929688
-      ],
-      "size": [
-        315,
-        106
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "image_embeds",
-          "type": "WANVIDIMAGE_EMBEDS",
-          "links": [
-            42
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "WanVideoEmptyEmbeds"
-      },
-      "widgets_values": [
-        512,
-        512,
-        53
-      ]
-    },
-    {
       "id": 42,
       "type": "WanVideoEncode",
       "pos": [
@@ -389,7 +194,7 @@
         222
       ],
       "flags": {},
-      "order": 11,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -438,7 +243,7 @@
         261.5306701660156
       ],
       "flags": {},
-      "order": 9,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
@@ -565,8 +370,8 @@
         -390.24658203125
       ],
       "size": [
-        912.0325317382812,
-        794.0162353515625
+        214.7587890625,
+        376
       ],
       "flags": {},
       "order": 15,
@@ -691,8 +496,7 @@
         true,
         "dpm++",
         0,
-        0.5,
-        ""
+        0.5
       ]
     },
     {
@@ -707,7 +511,7 @@
         226.43276977539062
       ],
       "flags": {},
-      "order": 8,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -724,7 +528,7 @@
         },
         {
           "name": "lora",
-          "type": "HYVIDLORA",
+          "type": "WANVIDLORA",
           "shape": 7,
           "link": null
         }
@@ -748,6 +552,236 @@
         "fp8_e4m3fn",
         "offload_device",
         "sdpa"
+      ]
+    },
+    {
+      "id": 43,
+      "type": "VHS_LoadVideo",
+      "pos": [
+        304.38446044921875,
+        285.45703125
+      ],
+      "size": [
+        247.455078125,
+        551.455078125
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "meta_batch",
+          "type": "VHS_BatchManager",
+          "shape": 7,
+          "link": null
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "shape": 7,
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            51
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "frame_count",
+          "type": "INT",
+          "links": [
+            56
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null
+        },
+        {
+          "name": "video_info",
+          "type": "VHS_VIDEOINFO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VHS_LoadVideo"
+      },
+      "widgets_values": {
+        "video": "wolf_interpolated.mp4",
+        "force_rate": 0,
+        "custom_width": 0,
+        "custom_height": 0,
+        "frame_load_cap": 0,
+        "skip_first_frames": 0,
+        "select_every_nth": 1,
+        "format": "AnimateDiff",
+        "choose video to upload": "image",
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "wolf_interpolated.mp4",
+            "type": "input",
+            "format": "video/mp4",
+            "force_rate": 0,
+            "custom_width": 0,
+            "custom_height": 0,
+            "frame_load_cap": 0,
+            "skip_first_frames": 0,
+            "select_every_nth": 1
+          }
+        }
+      }
+    },
+    {
+      "id": 44,
+      "type": "ImageResizeKJ",
+      "pos": [
+        744.0538940429688,
+        288.3457336425781
+      ],
+      "size": [
+        315,
+        266
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 51
+        },
+        {
+          "name": "get_image_size",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": null
+        },
+        {
+          "name": "width_input",
+          "type": "INT",
+          "shape": 7,
+          "widget": {
+            "name": "width_input"
+          },
+          "link": null
+        },
+        {
+          "name": "height_input",
+          "type": "INT",
+          "shape": 7,
+          "widget": {
+            "name": "height_input"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            52,
+            53
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": [
+            57
+          ],
+          "slot_index": 1
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": [
+            58
+          ],
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageResizeKJ"
+      },
+      "widgets_values": [
+        512,
+        512,
+        "lanczos",
+        false,
+        2,
+        0,
+        0,
+        "disabled"
+      ]
+    },
+    {
+      "id": 37,
+      "type": "WanVideoEmptyEmbeds",
+      "pos": [
+        753.8429565429688,
+        611.1437377929688
+      ],
+      "size": [
+        315,
+        106
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "link": 56
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": 57
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": 58
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image_embeds",
+          "type": "WANVIDIMAGE_EMBEDS",
+          "links": [
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WanVideoEmptyEmbeds"
+      },
+      "widgets_values": [
+        512,
+        512,
+        53
       ]
     }
   ],
@@ -855,6 +889,30 @@
       30,
       0,
       "IMAGE"
+    ],
+    [
+      56,
+      43,
+      1,
+      37,
+      0,
+      "INT"
+    ],
+    [
+      57,
+      44,
+      1,
+      37,
+      1,
+      "INT"
+    ],
+    [
+      58,
+      44,
+      2,
+      37,
+      2,
+      "INT"
     ]
   ],
   "groups": [],
@@ -863,14 +921,14 @@
     "ds": {
       "scale": 0.7400249944258602,
       "offset": [
-        258.6149287858856,
-        720.1786467276197
+        284.7158133898148,
+        654.2847544053307
       ]
     },
     "node_versions": {
-      "ComfyUI-WanVideoWrapper": "44c5944f7031949440315038e94ca3f46e80adb2",
-      "ComfyUI-VideoHelperSuite": "2c25b8b53835aaeb63f831b3137c705cf9f85dce",
-      "ComfyUI-KJNodes": "4b3009e4bf264b4ee6d777946bba3a6e54997bc9"
+      "ComfyUI-WanVideoWrapper": "b0fa8123c638200de08bb48c7a39f7cd39836e00",
+      "ComfyUI-KJNodes": "1a4259f05206d7360be7a90145b5839d5b64d893",
+      "ComfyUI-VideoHelperSuite": "2c25b8b53835aaeb63f831b3137c705cf9f85dce"
     },
     "VHS_latentpreview": true,
     "VHS_latentpreviewrate": 0,
