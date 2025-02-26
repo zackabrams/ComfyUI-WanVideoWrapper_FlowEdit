@@ -3,3 +3,4 @@ accelerate
 einops
 diffusers
 sentencepiece>=0.2.0
+protobuf
