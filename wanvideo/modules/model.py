@@ -497,10 +497,10 @@ class WanModel(ModelMixin, ConfigMixin):
        
         for b, block in enumerate(self.blocks):
             if b > self.blocks_to_swap:
-                print(f"Moving double_block {b} to main device")
+                print(f"Moving transformer block {b} to main device")
                 block.to(self.main_device)
             else:
-                print(f"Moving double_block {b} to offload_device")
+                print(f"Moving transformer block {b} to offload_device")
                 block.to(self.offload_device)
 
     def forward(
