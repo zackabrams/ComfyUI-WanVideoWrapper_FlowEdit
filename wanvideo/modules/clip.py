@@ -391,17 +391,17 @@ class XLMRobertaCLIP(nn.Module):
             proj_dropout=proj_dropout,
             embedding_dropout=embedding_dropout,
             norm_eps=norm_eps)
-        self.textual = XLMRobertaWithHead(
-            vocab_size=vocab_size,
-            max_seq_len=max_text_len,
-            type_size=type_size,
-            pad_id=pad_id,
-            dim=text_dim,
-            out_dim=embed_dim,
-            num_heads=text_heads,
-            num_layers=text_layers,
-            post_norm=text_post_norm,
-            dropout=text_dropout)
+        # self.textual = XLMRobertaWithHead(
+        #     vocab_size=vocab_size,
+        #     max_seq_len=max_text_len,
+        #     type_size=type_size,
+        #     pad_id=pad_id,
+        #     dim=text_dim,
+        #     out_dim=embed_dim,
+        #     num_heads=text_heads,
+        #     num_layers=text_layers,
+        #     post_norm=text_post_norm,
+        #     dropout=text_dropout)
         self.log_scale = nn.Parameter(math.log(1 / 0.07) * torch.ones([]))
 
     def forward(self, imgs, txt_ids):
