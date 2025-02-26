@@ -720,6 +720,7 @@ class WanVideoImageClipEncode:
 
         y = torch.concat([mask, y])
 
+        vae.model.clear_cache()
         vae.to(offload_device)
 
         image_embeds = {
