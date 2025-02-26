@@ -857,7 +857,7 @@ class WanVideoSampler:
             lat_h = image_embeds.get("lat_h", None)
             lat_w = image_embeds.get("lat_w", None)
             if lat_h is None or lat_w is None:
-                raise ValueError("Clip encoded image embeds must be provided for i2v model")
+                raise ValueError("Clip encoded image embeds must be provided for I2V (Image to Video) model")
             noise = torch.randn(
                 16,
                 (image_embeds["num_frames"] - 1) // 4 + 1,
@@ -868,7 +868,9 @@ class WanVideoSampler:
                 device=torch.device("cpu"))
             seq_len = image_embeds["max_seq_len"]
         else: #t2v
-            target_shape = image_embeds["target_shape"]
+            target_shape = image_embeds.get("target_shape", None)
+            if target_shape is None:
+                raise ValueError("Empty image embeds must be provided for T2V (Text to Video")
             seq_len = image_embeds["max_seq_len"]
             noise = torch.randn(
                     target_shape[0],
