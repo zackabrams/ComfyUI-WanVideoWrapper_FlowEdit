@@ -122,7 +122,7 @@ def filter_state_dict_by_blocks(state_dict, blocks_mapping):
     filtered_dict = {}
 
     for key in state_dict:
-        if 'double_blocks.' in key or 'single_blocks.' in key:
+        if 'blocks.' in key:
             block_pattern = key.split('diffusion_model.')[1].split('.', 2)[0:2]
             block_key = f'{block_pattern[0]}.{block_pattern[1]}.'
 
@@ -185,6 +185,31 @@ class WanVideoLoraSelect:
         loras_list.append(lora)
         return (loras_list,)
 
+class WanVideoLoraBlockEdit:
+    def __init__(self):
+        self.loaded_lora = None
+
+    @classmethod
+    def INPUT_TYPES(s):
+        arg_dict = {}
+        argument = ("BOOLEAN", {"default": True})
+
+        for i in range(40):
+            arg_dict["blocks.{}.".format(i)] = argument
+
+        return {"required": arg_dict}
+
+    RETURN_TYPES = ("SELECTEDBLOCKS", )
+    RETURN_NAMES = ("blocks", )
+    OUTPUT_TOOLTIPS = ("The modified lora model",)
+    FUNCTION = "select"
+
+    CATEGORY = "WanVideoWrapper"
+
+    def select(self, **kwargs):
+        selected_blocks = {k: v for k, v in kwargs.items() if v is True and isinstance(v, bool)}
+        print("Selected blocks LoRA: ", selected_blocks)
+        return (selected_blocks,)
 
 #region Model loading
 class WanVideoModelLoader:
@@ -1179,6 +1204,7 @@ NODE_CLASS_MAPPINGS = {
     "WanVideoLatentPreview": WanVideoLatentPreview,
     "WanVideoEmptyEmbeds": WanVideoEmptyEmbeds,
     "WanVideoLoraSelect": WanVideoLoraSelect,
+    "WanVideoLoraBlockEdit": WanVideoLoraBlockEdit,
     }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoSampler": "WanVideo Sampler",
@@ -1196,4 +1222,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoLatentPreview": "WanVideo Latent Preview",
     "WanVideoEmptyEmbeds": "WanVideo Empty Embeds",
     "WanVideoLoraSelect": "WanVideo Lora Select",
+    "WanVideoLoraBlockEdit": "WanVideo Lora Block Edit",
     }
