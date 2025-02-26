@@ -153,9 +153,9 @@ def attention(
     attention_mode='sdpa',
 ):  
     if "flash" in attention_mode:
-        if attention_mode == 'flash_attention_2':
+        if attention_mode == 'flash_attn_2':
             fa_version = 2
-        elif attention_mode == 'flash_attention_3':
+        elif attention_mode == 'flash_attn_3':
             fa_version = 3
         return flash_attention(
             q=q,
