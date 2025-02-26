@@ -39,6 +39,7 @@ def rope_params(max_seq_len, dim, theta=10000, L_test=81, k=0):
 
 
 @amp.autocast(enabled=False)
+@torch.compiler.disable()
 def rope_apply(x, grid_sizes, freqs):
     n, c = x.size(2), x.size(3) // 2
 
@@ -299,23 +300,26 @@ class WanAttentionBlock(nn.Module):
             freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
         """
         assert e.dtype == torch.float32
-        with amp.autocast(dtype=torch.float32):
-            e = (self.modulation + e).chunk(6, dim=1)
+        #with amp.autocast(dtype=torch.float32):
+        #    e = (self.modulation + e).chunk(6, dim=1)
+        e = (self.modulation.to(torch.float32) + e.to(torch.float32)).chunk(6, dim=1)
         assert e[0].dtype == torch.float32
 
         # self-attention
         y = self.self_attn(
             self.norm1(x).float() * (1 + e[1]) + e[0], seq_lens, grid_sizes,
             freqs)
-        with amp.autocast(dtype=torch.float32):
-            x = x + y * e[2]
+        #with amp.autocast(dtype=torch.float32):
+         #   x = x + y * e[2]
+        x = x.to(torch.float32) + (y.to(torch.float32) * e[2].to(torch.float32))
 
         # cross-attention & ffn function
         def cross_attn_ffn(x, context, context_lens, e):
             x = x + self.cross_attn(self.norm3(x), context, context_lens)
             y = self.ffn(self.norm2(x).float() * (1 + e[4]) + e[3])
-            with amp.autocast(dtype=torch.float32):
-                x = x + y * e[5]
+            #with amp.autocast(dtype=torch.float32):
+            #    x = x + y * e[5]
+            x = x.to(torch.float32) + (y.to(torch.float32) * e[5].to(torch.float32))
             return x
 
         x = cross_attn_ffn(x, context, context_lens, e)
@@ -346,9 +350,13 @@ class Head(nn.Module):
             e(Tensor): Shape [B, C]
         """
         assert e.dtype == torch.float32
-        with amp.autocast(dtype=torch.float32):
-            e = (self.modulation + e.unsqueeze(1)).chunk(2, dim=1)
-            x = (self.head(self.norm(x) * (1 + e[1]) + e[0]))
+        # with amp.autocast(dtype=torch.float32):
+        #     e = (self.modulation + e.unsqueeze(1)).chunk(2, dim=1)
+        #     x = (self.head(self.norm(x) * (1 + e[1]) + e[0]))
+        e_unsqueezed = e.unsqueeze(1).to(torch.float32)
+        e = (self.modulation.to(torch.float32) + e_unsqueezed).chunk(2, dim=1)
+        normed = self.norm(x).to(torch.float32)
+        x = self.head(normed * (1 + e[1].to(torch.float32)) + e[0].to(torch.float32))
         return x
 
 
@@ -558,7 +566,7 @@ class WanModel(ModelMixin, ConfigMixin):
         ])
 
         # time embeddings
-        with amp.autocast(dtype=torch.float32):
+        with torch.autocast(device_type='cuda', dtype=torch.float32):
             e = self.time_embedding(
                 sinusoidal_embedding_1d(self.freq_dim, t).float())
             e0 = self.time_projection(e).unflatten(1, (6, self.dim))
