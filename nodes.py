@@ -618,6 +618,7 @@ class WanVideoTextEncode:
 
         if force_offload:
             encoder.model.to(offload_device)
+            mm.soft_empty_cache()
 
 
         prompt_embeds_dict = {
@@ -667,6 +668,7 @@ class WanVideoImageClipEncode:
         clip_context = clip.visual(pixel_values)
         if force_offload:
             clip.model.to(offload_device)
+            mm.soft_empty_cache()
 
         aspect_ratio = H / W
         lat_h = round(
