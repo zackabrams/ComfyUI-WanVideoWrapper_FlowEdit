@@ -22,7 +22,7 @@ from comfy.utils import load_torch_file, save_torch_file, ProgressBar, common_up
 import comfy.model_base
 import comfy.latent_formats
 
-from .nodes.flowedit_nodes import WanVideoFlowEditSamplerNode
+from .flowedit_nodes import WanVideoFlowEditSamplerNode
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
