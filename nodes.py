@@ -22,6 +22,8 @@ from comfy.utils import load_torch_file, save_torch_file, ProgressBar, common_up
 import comfy.model_base
 import comfy.latent_formats
 
+from .nodes.flowedit_nodes import WanVideoFlowEditSamplerNode
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 def add_noise_to_reference_video(image, ratio=None):
@@ -1210,6 +1212,7 @@ NODE_CLASS_MAPPINGS = {
     "WanVideoEmptyEmbeds": WanVideoEmptyEmbeds,
     "WanVideoLoraSelect": WanVideoLoraSelect,
     "WanVideoLoraBlockEdit": WanVideoLoraBlockEdit,
+    "WanVideoFlowEditSamplerNode": WanVideoFlowEditSamplerNode,
     }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoSampler": "WanVideo Sampler",
@@ -1228,4 +1231,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "WanVideoEmptyEmbeds": "WanVideo Empty Embeds",
     "WanVideoLoraSelect": "WanVideo Lora Select",
     "WanVideoLoraBlockEdit": "WanVideo Lora Block Edit",
+    "WanVideoFlowEditSamplerNode": "WanVideo Flow Edit (Wrapper)",
     }
