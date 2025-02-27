@@ -173,10 +173,10 @@ def attention(
             version=fa_version,
         )
     elif attention_mode == 'sdpa':
-        if q_lens is not None or k_lens is not None:
-            warnings.warn(
-                'Padding mask is disabled when using scaled_dot_product_attention. It can have a significant impact on performance.'
-            )
+        # if q_lens is not None or k_lens is not None:
+        #     warnings.warn(
+        #         'Padding mask is disabled when using scaled_dot_product_attention. It can have a significant impact on performance.'
+        #     )
         attn_mask = None
 
         q = q.transpose(1, 2).to(dtype)

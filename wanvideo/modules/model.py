@@ -273,7 +273,8 @@ class WanAttentionBlock(nn.Module):
                                                                       num_heads,
                                                                       (-1, -1),
                                                                       qk_norm,
-                                                                      eps)
+                                                                      eps,#attention_mode=attention_mode sageattn doesn't seem faster here
+                                                                      )
         self.norm2 = WanLayerNorm(dim, eps)
         self.ffn = nn.Sequential(
             nn.Linear(dim, ffn_dim), nn.GELU(approximate='tanh'),

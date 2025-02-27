@@ -102,14 +102,19 @@ class WanVideoModel(comfy.model_base.BaseModel):
     def __setitem__(self, k, v):
         self.pipeline[k] = v
 
-from comfy.latent_formats import LatentFormat
-
+try:
+    from comfy.latent_formats import Wan21
+    latent_format = Wan21
+except: #for backwards compatibility
+    log.warning("Wan21 latent format not found, update ComfyUI for better livepreview")
+    from comfy.latent_formats import HunyuanVideo
+    latent_format = HunyuanVideo
 
 class WanVideoModelConfig:
     def __init__(self, dtype):
         self.unet_config = {}
         self.unet_extra_config = {}
-        self.latent_format = comfy.latent_formats.HunyuanVideo #todo better values
+        self.latent_format = latent_format
         self.latent_format.latent_channels = 16
         self.manual_cast_dtype = dtype
         self.sampling_settings = {"multiplier": 1.0}
@@ -960,7 +965,7 @@ class WanVideoSampler:
 
         mm.soft_empty_cache()
         gc.collect()
-
+        
         try:
             torch.cuda.reset_peak_memory_stats(device)
         except:
